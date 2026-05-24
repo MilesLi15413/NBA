@@ -100,9 +100,16 @@ function applyBlur(el, team) {
   el.dataset.ssBlurred = 'true';
   el.dataset.ssTeam = team.espnId;
   el.style.position = 'relative';
+  el.style.overflow = 'hidden';
+  el.style.filter = 'blur(6px)';
+  el.style.isolation = 'isolate';  // add this
+  el.style.transform = 'translateZ(0)'; // forces GPU layer isolation
+
+
 
   const overlay = document.createElement('div');
   overlay.className = 'ss-overlay';
+  overlay.style.filter = 'blur(0px)';
   overlay.innerHTML = `
     <div class="ss-overlay-inner">
       <div class="ss-lock">
@@ -153,6 +160,7 @@ function showConfirmation(el, overlay, team) {
   dialog.querySelector('.ss-btn-confirm').addEventListener('click', () => {
     dialog.remove();
     overlay.remove();
+    el.style.filter = 'none';
     el.dataset.ssBlurred = 'removed';
   });
 
@@ -172,6 +180,8 @@ function scanPage() {
     'ytd-compact-video-renderer',
     'ytd-grid-video-renderer',
     'ytd-video-with-context-renderer',
+    'ytd-watch-card-hero-video-renderer',
+
     // Shorts
     'ytd-reel-item-renderer',
     'ytd-shorts',
@@ -201,22 +211,32 @@ function scanPage() {
   ].join(', ');
 
   document.querySelectorAll(selectors).forEach(el => {
-    if (el.dataset.ssBlurred === 'true') return;
-    if (el.dataset.ssBlurred === 'removed') return;
+  if (el.dataset.ssBlurred === 'true') return;
+  if (el.dataset.ssBlurred === 'removed') return;
 
-    const text = getCardText(el);
-    if (!text) return;
+  const text = getCardText(el);
 
-    const team = matchesBlockedTeam(text);
-    if (team) applyBlur(el, team);
-  });
+  if (!text) {
+    el.classList.add('ss-scanned');
+    return;
+  }
+
+  const team = matchesBlockedTeam(text);
+  if (team) {
+    applyBlur(el, team);
+  } else {
+    el.classList.add('ss-scanned');
+  }
+});
 }
 
 // Full reset - removes all blurs and rescans
 function fullReset() {
-  document.querySelectorAll('[data-ss-blurred="true"]').forEach(el => {
+  document.querySelectorAll('[data-ss-blurred="true"], .ss-scanned').forEach(el => {
     el.querySelector('.ss-overlay')?.remove();
+    el.style.filter = 'none';
     el.dataset.ssBlurred = '';
+    el.classList.remove('ss-scanned'); // add this
   });
 
   loadSettings(() => scanPage());
