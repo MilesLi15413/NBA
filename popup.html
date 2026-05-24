@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Spoiler Shield</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 360px;
+      background: #0d0d1a;
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      padding: 16px;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .title {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .title span { color: #f97316; }
+
+    .refresh-btn {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.1);
+      color: rgba(255,255,255,0.5);
+      border-radius: 7px;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .refresh-btn:hover {
+      color: #fff;
+      border-color: rgba(255,255,255,0.3);
+    }
+
+    .refresh-btn.spinning svg {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Status */
+    .status {
+      font-size: 11px;
+      color: rgba(255,255,255,0.4);
+      margin-bottom: 14px;
+      text-align: center;
+    }
+
+    /* Team grid */
+    .section-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.35);
+      margin-bottom: 10px;
+    }
+
+    .team-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .team-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 6px;
+      background: #14142a;
+      border: 2px solid transparent;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .team-card:hover {
+      background: #1c1c38;
+      border-color: rgba(255,255,255,0.1);
+    }
+
+    .team-card.selected {
+      border-color: #f97316;
+      background: rgba(249,115,22,0.08);
+    }
+
+    .team-logo {
+      width: 40px;
+      height: 40px;
+      object-fit: contain;
+    }
+
+    .team-abbr {
+      font-size: 10px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.6);
+      letter-spacing: 0.05em;
+    }
+
+    .team-card.selected .team-abbr {
+      color: #f97316;
+    }
+
+    /* Loading / empty states */
+    .loading {
+      text-align: center;
+      color: rgba(255,255,255,0.4);
+      font-size: 12px;
+      padding: 30px 0;
+    }
+
+    .loading-spinner {
+      width: 24px;
+      height: 24px;
+      border: 2px solid rgba(255,255,255,0.1);
+      border-top-color: #f97316;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 10px;
+    }
+
+    /* Footer */
+    .footer {
+      border-top: 1px solid rgba(255,255,255,0.06);
+      padding-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .footer-text {
+      font-size: 10px;
+      color: rgba(255,255,255,0.3);
+    }
+
+    .selected-count {
+      font-size: 11px;
+      font-weight: 600;
+      color: #f97316;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="title">Spoiler<span>Shield</span> 🛡️</div>
+    <button class="refresh-btn" id="refreshBtn">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10"></polyline>
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+      </svg>
+    </button>
+  </div>
+
+  <div class="status" id="status">Loading playoff data...</div>
+
+  <div class="section-label">Active Playoff Teams — Click to Block</div>
+
+  <div class="team-grid" id="teamGrid">
+    <div class="loading">
+      <div class="loading-spinner"></div>
+      Fetching teams...
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-text" id="lastUpdated">—</div>
+    <div class="selected-count" id="selectedCount"></div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
