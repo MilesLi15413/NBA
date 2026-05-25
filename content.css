@@ -1,10 +1,9 @@
-
 .ss-overlay {
   position: absolute;
   inset: 0;
   z-index: 100;
   border-radius: 10px;
-  background: rgba(8, 8, 20, 0.85);  /* increase opacity */
+  background: rgba(8, 8, 20, 0.85);
   backdrop-filter: blur(20px) saturate(0.3);
   -webkit-backdrop-filter: blur(20px) saturate(0.3);
   display: flex;
@@ -22,7 +21,6 @@
   -webkit-backdrop-filter: blur(20px) saturate(0.5);
 }
 
-/* Inner content of the overlay */
 .ss-overlay-inner {
   display: flex;
   flex-direction: column;
@@ -31,13 +29,11 @@
   pointer-events: none;
 }
 
-/* Lock icon */
 .ss-lock {
   color: rgba(255, 255, 255, 0.9);
   filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5));
 }
 
-/* Spoiler Blocked label */
 .ss-label {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 11px;
@@ -47,7 +43,6 @@
   text-transform: uppercase;
 }
 
-/* Confirmation dialog backdrop */
 .ss-dialog {
   position: fixed;
   inset: 0;
@@ -66,7 +61,6 @@
   to { opacity: 1; }
 }
 
-/* Confirmation dialog box */
 .ss-dialog-box {
   background: #0f0f1e;
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -109,7 +103,6 @@
   color: rgba(255, 255, 255, 0.9);
 }
 
-/* Dialog buttons */
 .ss-dialog-buttons {
   display: flex;
   gap: 10px;
@@ -146,48 +139,6 @@
 .ss-btn-confirm:hover {
   transform: translateY(-1px);
   box-shadow: 0 6px 18px rgba(249, 115, 22, 0.45);
-}
-
-ytd-rich-item-renderer,
-ytd-video-renderer,
-ytd-compact-video-renderer,
-ytd-grid-video-renderer,
-ytd-video-with-context-renderer,
-ytd-reel-item-renderer,
-ytm-shorts-lockup-view-model,
-ytm-shorts-lockup-view-model-v2,
-ytd-playlist-renderer,
-ytd-compact-playlist-renderer,
-ytd-grid-playlist-renderer,
-ytd-radio-renderer,
-ytd-compact-radio-renderer,
-ytd-watch-card-compact-video-renderer,
-ytd-movie-renderer {
-  opacity: 0;
-  animation: ssReveal 0s 1.5s forwards;
-}
-
-@keyframes ssReveal {
-  to { opacity: 1; }
-}
-
-ytd-rich-item-renderer.ss-scanned,
-ytd-video-renderer.ss-scanned,
-ytd-compact-video-renderer.ss-scanned,
-ytd-grid-video-renderer.ss-scanned,
-ytd-video-with-context-renderer.ss-scanned,
-ytd-reel-item-renderer.ss-scanned,
-ytm-shorts-lockup-view-model.ss-scanned,
-ytm-shorts-lockup-view-model-v2.ss-scanned,
-ytd-playlist-renderer.ss-scanned,
-ytd-compact-playlist-renderer.ss-scanned,
-ytd-grid-playlist-renderer.ss-scanned,
-ytd-radio-renderer.ss-scanned,
-ytd-compact-radio-renderer.ss-scanned,
-ytd-watch-card-compact-video-renderer.ss-scanned,
-ytd-movie-renderer.ss-scanned {
-  opacity: 1;
-  animation: none;
 }
 
 #ss-page-shield {
@@ -227,10 +178,6 @@ ytd-movie-renderer.ss-scanned {
   letter-spacing: -0.02em;
 }
 
-.ss-shield-title span {
-  color: #f97316;
-}
-
 .ss-shield-subtitle {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 13px;
@@ -249,4 +196,31 @@ ytd-movie-renderer.ss-scanned {
 
 @keyframes ssShieldSpin {
   to { transform: rotate(360deg); }
+}
+body.ss-active ytd-rich-item-renderer,
+body.ss-active ytd-video-renderer,
+body.ss-active ytd-compact-video-renderer,
+body.ss-active ytd-grid-video-renderer,
+body.ss-active ytd-video-with-context-renderer,
+body.ss-active ytd-reel-item-renderer,
+body.ss-active ytd-shorts,
+body.ss-active ytd-reel-shelf-renderer,
+body.ss-active ytm-shorts-lockup-view-model,
+body.ss-active ytm-shorts-lockup-view-model-v2,
+body.ss-active ytd-playlist-renderer,
+body.ss-active ytd-compact-playlist-renderer,
+body.ss-active ytd-grid-playlist-renderer,
+body.ss-active ytd-radio-renderer,
+body.ss-active ytd-compact-radio-renderer,
+body.ss-active ytd-watch-card-compact-video-renderer,
+body.ss-active ytd-watch-card-rich-header-renderer,
+body.ss-active ytd-watch-card-hero-video-renderer,
+body.ss-active ytd-movie-renderer,
+body.ss-active ytd-clip-creation-renderer,
+body.ss-active ytd-search-pyv-renderer,
+body.ss-active ytd-notification-renderer,
+body.ss-active ytd-compact-live-meta-renderer,
+body.ss-active ytd-channel-video-player-renderer,
+body.ss-active ytd-featured-channel-renderer {
+  visibility: hidden;
 }

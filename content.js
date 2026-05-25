@@ -22,6 +22,7 @@ function injectShield() {
   s.id = 'ss-page-shield';
   s.innerHTML = createShieldHTML();
   document.documentElement.appendChild(s);
+  document.body.classList.add('ss-active');
   shieldShownAt = Date.now();
   shieldRemoved = false;
   scanComplete = false;
@@ -44,6 +45,7 @@ function removeShield() {
       return;
     }
     shieldRemoved = true;
+    document.body.classList.remove('ss-active');
     const s = document.getElementById('ss-page-shield');
     if (s) {
       s.classList.add('fade-out');
@@ -52,26 +54,9 @@ function removeShield() {
   }, remaining);
 }
 
-// Re-show shield on YouTube navigation (SPA page changes)
-let lastUrl = location.href;
-new MutationObserver(() => {
-  if (location.href !== lastUrl) {
-    lastUrl = location.href;
-    // Only re-inject if teams are selected
-    chrome.storage.local.get(['selectedTeams', 'enabled'], data => {
-      const selectedTeams = data.selectedTeams || [];
-      const enabled = data.enabled !== false;
-      if (selectedTeams.length > 0 && enabled) {
-        injectShield();
-      }
-    });
-  }
-}).observe(document.body, { childList: true, subtree: true });
-
 let blockedTeams = [];
 let isEnabled = true;
 
-// Load settings from storage
 function loadSettings(callback) {
   chrome.storage.local.get(['spoilerData', 'selectedTeams', 'enabled'], data => {
     const spoilerData = data.spoilerData;
@@ -86,7 +71,6 @@ function loadSettings(callback) {
   });
 }
 
-// Check if text matches any blocked team
 function matchesBlockedTeam(text) {
   if (!text) return null;
   const lower = text.toLowerCase();
@@ -113,6 +97,8 @@ function getCardText(el) {
     'a#video-title',
     '#movie-name',
     '.title',
+    '.title-fade',
+    '.title-container',
     '.ytd-watch-card-compact-video-renderer #video-title',
     '.shortsLockupViewModelHostOutsideMetadata',
     '.shortsLockupViewModelHostMetadataTitle',
@@ -174,6 +160,7 @@ function applyBlur(el, team) {
   el.style.position = 'relative';
   el.style.overflow = 'hidden';
   el.style.filter = 'blur(10px)';
+  el.style.visibility = 'visible';
 
   const overlay = document.createElement('div');
   overlay.className = 'ss-overlay';
@@ -236,6 +223,16 @@ function showConfirmation(el, overlay, team) {
   });
 }
 
+function allCardsScanned(selectors) {
+  const cards = document.querySelectorAll(selectors);
+  for (const el of cards) {
+    if (!el.dataset.ssBlurred && !el.classList.contains('ss-scanned')) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function scanPage() {
   const selectors = [
     'ytd-rich-item-renderer',
@@ -255,6 +252,7 @@ function scanPage() {
     'ytd-compact-radio-renderer',
     'ytd-watch-card-compact-video-renderer',
     'ytd-watch-card-rich-header-renderer',
+    'ytd-watch-card-hero-video-renderer',
     'ytd-movie-renderer',
     'ytd-clip-creation-renderer',
     'ytd-search-pyv-renderer',
@@ -265,8 +263,11 @@ function scanPage() {
   ].join(', ');
 
   const cards = document.querySelectorAll(selectors);
-
   if (cards.length === 0) return;
+
+  // Wait until at least one card has text loaded
+  const hasContent = [...cards].some(el => getCardText(el).length > 0);
+  if (!hasContent) return;
 
   if (!isEnabled || blockedTeams.length === 0) {
     scanComplete = true;
@@ -279,11 +280,7 @@ function scanPage() {
     if (el.dataset.ssBlurred === 'removed') return;
 
     const text = getCardText(el);
-
-    if (!text) {
-      el.classList.add('ss-scanned');
-      return;
-    }
+    if (!text) return;
 
     const team = matchesBlockedTeam(text);
     if (team) {
@@ -293,8 +290,10 @@ function scanPage() {
     }
   });
 
-  scanComplete = true;
-  removeShield();
+  if (allCardsScanned(selectors)) {
+    scanComplete = true;
+    removeShield();
+  }
 }
 
 function fullReset() {
@@ -302,6 +301,7 @@ function fullReset() {
   document.querySelectorAll('[data-ss-blurred="true"], .ss-scanned').forEach(el => {
     el.querySelector('.ss-overlay')?.remove();
     el.style.filter = 'none';
+    el.style.visibility = '';
     el.dataset.ssBlurred = '';
     el.classList.remove('ss-scanned');
   });
@@ -319,11 +319,29 @@ observer.observe(document.body, {
   subtree: true
 });
 
+let lastUrl = location.href;
+new MutationObserver(() => {
+  if (location.href !== lastUrl) {
+    lastUrl = location.href;
+
+    chrome.storage.local.get(['selectedTeams', 'enabled'], data => {
+      const selectedTeams = data.selectedTeams || [];
+      const enabled = data.enabled !== false;
+
+      if (selectedTeams.length > 0 && enabled) {
+        injectShield();
+        setTimeout(() => {
+          scanComplete = false;
+        }, 300);
+      }
+    });
+  }
+}).observe(document.body, { childList: true, subtree: true });
+
 chrome.runtime.onMessage.addListener(msg => {
   if (msg.type === 'RESCAN') fullReset();
 });
 
-// Init — only inject shield if teams are selected
 chrome.storage.local.get(['selectedTeams', 'enabled'], data => {
   const selectedTeams = data.selectedTeams || [];
   const enabled = data.enabled !== false;
