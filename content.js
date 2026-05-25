@@ -15,6 +15,15 @@ let shieldShownAt = Date.now();
 let shieldRemoved = false;
 let scanComplete = false;
 
+// Turn on per-card hiding: every card stays hidden until individually scanned/blurred
+function enableFiltering() {
+  document.body.classList.add('ss-filtering');
+}
+
+function disableFiltering() {
+  document.body.classList.remove('ss-filtering');
+}
+
 function injectShield() {
   const existing = document.getElementById('ss-page-shield');
   if (existing) existing.remove();
@@ -22,7 +31,6 @@ function injectShield() {
   s.id = 'ss-page-shield';
   s.innerHTML = createShieldHTML();
   document.documentElement.appendChild(s);
-  document.body.classList.add('ss-active');
   shieldShownAt = Date.now();
   shieldRemoved = false;
   scanComplete = false;
@@ -33,6 +41,8 @@ function injectShield() {
   }, 6000);
 }
 
+// Shield is purely cosmetic now — card visibility is handled per-card by CSS.
+// Removing the shield does NOT reveal cards; only scanning does.
 function removeShield() {
   if (shieldRemoved) return;
   const elapsed = Date.now() - shieldShownAt;
@@ -45,7 +55,6 @@ function removeShield() {
       return;
     }
     shieldRemoved = true;
-    document.body.classList.remove('ss-active');
     const s = document.getElementById('ss-page-shield');
     if (s) {
       s.classList.add('fade-out');
@@ -65,6 +74,15 @@ function loadSettings(callback) {
 
     if (spoilerData && spoilerData.teams) {
       blockedTeams = spoilerData.teams.filter(t => selectedIds.has(t.espnId));
+    } else {
+      blockedTeams = [];
+    }
+
+    // Only filter (hide cards) when enabled and teams are selected
+    if (isEnabled && blockedTeams.length > 0) {
+      enableFiltering();
+    } else {
+      disableFiltering();
     }
 
     if (callback) callback();
@@ -223,8 +241,36 @@ function showConfirmation(el, overlay, team) {
   });
 }
 
-function allCardsScanned(selectors) {
-  const cards = document.querySelectorAll(selectors);
+const SELECTORS = [
+  'ytd-rich-item-renderer',
+  'ytd-video-renderer',
+  'ytd-compact-video-renderer',
+  'ytd-grid-video-renderer',
+  'ytd-video-with-context-renderer',
+  'ytd-reel-item-renderer',
+  'ytd-shorts',
+  'ytd-reel-shelf-renderer',
+  'ytm-shorts-lockup-view-model',
+  'ytm-shorts-lockup-view-model-v2',
+  'ytd-playlist-renderer',
+  'ytd-compact-playlist-renderer',
+  'ytd-grid-playlist-renderer',
+  'ytd-radio-renderer',
+  'ytd-compact-radio-renderer',
+  'ytd-watch-card-compact-video-renderer',
+  'ytd-watch-card-rich-header-renderer',
+  'ytd-watch-card-hero-video-renderer',
+  'ytd-movie-renderer',
+  'ytd-clip-creation-renderer',
+  'ytd-search-pyv-renderer',
+  'ytd-notification-renderer',
+  'ytd-compact-live-meta-renderer',
+  'ytd-channel-video-player-renderer',
+  'ytd-featured-channel-renderer'
+].join(', ');
+
+function allCardsScanned() {
+  const cards = document.querySelectorAll(SELECTORS);
   for (const el of cards) {
     if (!el.dataset.ssBlurred && !el.classList.contains('ss-scanned')) {
       return false;
@@ -234,41 +280,10 @@ function allCardsScanned(selectors) {
 }
 
 function scanPage() {
-  const selectors = [
-    'ytd-rich-item-renderer',
-    'ytd-video-renderer',
-    'ytd-compact-video-renderer',
-    'ytd-grid-video-renderer',
-    'ytd-video-with-context-renderer',
-    'ytd-reel-item-renderer',
-    'ytd-shorts',
-    'ytd-reel-shelf-renderer',
-    'ytm-shorts-lockup-view-model',
-    'ytm-shorts-lockup-view-model-v2',
-    'ytd-playlist-renderer',
-    'ytd-compact-playlist-renderer',
-    'ytd-grid-playlist-renderer',
-    'ytd-radio-renderer',
-    'ytd-compact-radio-renderer',
-    'ytd-watch-card-compact-video-renderer',
-    'ytd-watch-card-rich-header-renderer',
-    'ytd-watch-card-hero-video-renderer',
-    'ytd-movie-renderer',
-    'ytd-clip-creation-renderer',
-    'ytd-search-pyv-renderer',
-    'ytd-notification-renderer',
-    'ytd-compact-live-meta-renderer',
-    'ytd-channel-video-player-renderer',
-    'ytd-featured-channel-renderer'
-  ].join(', ');
-
-  const cards = document.querySelectorAll(selectors);
+  const cards = document.querySelectorAll(SELECTORS);
   if (cards.length === 0) return;
 
-  // Wait until at least one card has text loaded
-  const hasContent = [...cards].some(el => getCardText(el).length > 0);
-  if (!hasContent) return;
-
+  // If not filtering, nothing to hide — just drop the shield.
   if (!isEnabled || blockedTeams.length === 0) {
     scanComplete = true;
     removeShield();
@@ -278,19 +293,21 @@ function scanPage() {
   cards.forEach(el => {
     if (el.dataset.ssBlurred === 'true') return;
     if (el.dataset.ssBlurred === 'removed') return;
+    if (el.classList.contains('ss-scanned')) return;
 
     const text = getCardText(el);
+    // No text yet — leave hidden, next scan cycle will catch it (no reveal = no flash)
     if (!text) return;
 
     const team = matchesBlockedTeam(text);
     if (team) {
-      applyBlur(el, team);
+      applyBlur(el, team);          // blurred + made visible inline
     } else {
-      el.classList.add('ss-scanned');
+      el.classList.add('ss-scanned'); // CSS makes this one visible
     }
   });
 
-  if (allCardsScanned(selectors)) {
+  if (allCardsScanned()) {
     scanComplete = true;
     removeShield();
   }
@@ -309,6 +326,7 @@ function fullReset() {
   loadSettings(() => scanPage());
 }
 
+// Main scan observer
 const observer = new MutationObserver(() => {
   clearTimeout(window._ssScanTimer);
   window._ssScanTimer = setTimeout(scanPage, 200);
@@ -319,6 +337,7 @@ observer.observe(document.body, {
   subtree: true
 });
 
+// URL change observer — re-show shield on YouTube SPA navigation
 let lastUrl = location.href;
 new MutationObserver(() => {
   if (location.href !== lastUrl) {
@@ -329,6 +348,7 @@ new MutationObserver(() => {
       const enabled = data.enabled !== false;
 
       if (selectedTeams.length > 0 && enabled) {
+        enableFiltering();   // keep cards hidden through the navigation
         injectShield();
         setTimeout(() => {
           scanComplete = false;
@@ -342,11 +362,13 @@ chrome.runtime.onMessage.addListener(msg => {
   if (msg.type === 'RESCAN') fullReset();
 });
 
+// Init
 chrome.storage.local.get(['selectedTeams', 'enabled'], data => {
   const selectedTeams = data.selectedTeams || [];
   const enabled = data.enabled !== false;
 
   if (selectedTeams.length > 0 && enabled) {
+    enableFiltering();
     injectShield();
   } else {
     scanComplete = true;

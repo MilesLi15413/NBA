@@ -197,30 +197,44 @@
 @keyframes ssShieldSpin {
   to { transform: rotate(360deg); }
 }
-body.ss-active ytd-rich-item-renderer,
-body.ss-active ytd-video-renderer,
-body.ss-active ytd-compact-video-renderer,
-body.ss-active ytd-grid-video-renderer,
-body.ss-active ytd-video-with-context-renderer,
-body.ss-active ytd-reel-item-renderer,
-body.ss-active ytd-shorts,
-body.ss-active ytd-reel-shelf-renderer,
-body.ss-active ytm-shorts-lockup-view-model,
-body.ss-active ytm-shorts-lockup-view-model-v2,
-body.ss-active ytd-playlist-renderer,
-body.ss-active ytd-compact-playlist-renderer,
-body.ss-active ytd-grid-playlist-renderer,
-body.ss-active ytd-radio-renderer,
-body.ss-active ytd-compact-radio-renderer,
-body.ss-active ytd-watch-card-compact-video-renderer,
-body.ss-active ytd-watch-card-rich-header-renderer,
-body.ss-active ytd-watch-card-hero-video-renderer,
-body.ss-active ytd-movie-renderer,
-body.ss-active ytd-clip-creation-renderer,
-body.ss-active ytd-search-pyv-renderer,
-body.ss-active ytd-notification-renderer,
-body.ss-active ytd-compact-live-meta-renderer,
-body.ss-active ytd-channel-video-player-renderer,
-body.ss-active ytd-featured-channel-renderer {
+
+/* PER-CARD HIDING:
+   While filtering is active, every card is hidden by default.
+   A card only becomes visible once it has been individually processed —
+   either marked .ss-scanned (safe) or [data-ss-blurred] (blurred spoiler).
+   This guarantees an unprocessed card is NEVER visible, so there is no flash. */
+
+body.ss-filtering ytd-rich-item-renderer,
+body.ss-filtering ytd-video-renderer,
+body.ss-filtering ytd-compact-video-renderer,
+body.ss-filtering ytd-grid-video-renderer,
+body.ss-filtering ytd-video-with-context-renderer,
+body.ss-filtering ytd-reel-item-renderer,
+body.ss-filtering ytd-shorts,
+body.ss-filtering ytd-reel-shelf-renderer,
+body.ss-filtering ytm-shorts-lockup-view-model,
+body.ss-filtering ytm-shorts-lockup-view-model-v2,
+body.ss-filtering ytd-playlist-renderer,
+body.ss-filtering ytd-compact-playlist-renderer,
+body.ss-filtering ytd-grid-playlist-renderer,
+body.ss-filtering ytd-radio-renderer,
+body.ss-filtering ytd-compact-radio-renderer,
+body.ss-filtering ytd-watch-card-compact-video-renderer,
+body.ss-filtering ytd-watch-card-rich-header-renderer,
+body.ss-filtering ytd-watch-card-hero-video-renderer,
+body.ss-filtering ytd-movie-renderer,
+body.ss-filtering ytd-clip-creation-renderer,
+body.ss-filtering ytd-search-pyv-renderer,
+body.ss-filtering ytd-notification-renderer,
+body.ss-filtering ytd-compact-live-meta-renderer,
+body.ss-filtering ytd-channel-video-player-renderer,
+body.ss-filtering ytd-featured-channel-renderer {
   visibility: hidden;
+}
+
+/* Reveal only once individually processed */
+body.ss-filtering .ss-scanned,
+body.ss-filtering [data-ss-blurred="true"],
+body.ss-filtering [data-ss-blurred="removed"] {
+  visibility: visible !important;
 }
