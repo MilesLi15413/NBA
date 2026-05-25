@@ -2,66 +2,80 @@
 
 let selectedTeams = new Set();
 let allTeams = [];
+let todayIds = new Set();
+let allTeamsExpanded = false;
 
-// Load everything when popup opens
 async function init() {
   const stored = await getStorage('selectedTeams');
   selectedTeams = new Set(stored.selectedTeams || []);
 
-  const data = await getStorage('playoffData');
+  // Check for sync error
+  const errorData = await getStorage('syncError');
+  if (errorData.syncError) {
+    showError(errorData.syncError);
+  }
 
-  if (data.playoffData) {
-    allTeams = data.playoffData.teams;
+  const data = await getStorage('spoilerData');
+
+  if (data.spoilerData) {
+    allTeams = data.spoilerData.teams;
+    todayIds = new Set(data.spoilerData.todayIds || []);
     renderTeams();
     updateLastUpdated();
   } else {
-    showLoading('Fetching playoff data...');
+    showLoading('teamGrid', 'Fetching data...');
     chrome.runtime.sendMessage({ type: 'FORCE_SYNC' }, () => {
-      chrome.storage.local.get('playoffData', data => {
-        if (data.playoffData) {
-          allTeams = data.playoffData.teams;
+      chrome.storage.local.get('spoilerData', data => {
+        if (data.spoilerData) {
+          allTeams = data.spoilerData.teams;
+          todayIds = new Set(data.spoilerData.todayIds || []);
           renderTeams();
           updateLastUpdated();
         } else {
-          showLoading('No active playoff games found.');
+          showLoading('teamGrid', 'No data found.');
         }
       });
     });
   }
 }
 
-// Render team logo grid
 function renderTeams() {
   const grid = document.getElementById('teamGrid');
-
-  if (allTeams.length === 0) {
-    grid.innerHTML = `<div class="loading">No active playoff games right now.</div>`;
-    updateStatus('No active games');
-    return;
-  }
-
   grid.innerHTML = '';
 
-  allTeams.forEach(team => {
-    const isSelected = selectedTeams.has(team.espnId);
-    const card = document.createElement('div');
-    card.className = `team-card ${isSelected ? 'selected' : ''}`;
-    card.dataset.id = team.espnId;
+  const todaysTeams = allTeams.filter(t => todayIds.has(t.espnId));
+  const otherTeams = allTeams.filter(t => !todayIds.has(t.espnId));
 
-    card.innerHTML = `
-      <img class="team-logo" src="${team.logo}" alt="${team.abbreviation}">
-      <div class="team-abbr">${team.abbreviation}</div>
-    `;
+  if (todaysTeams.length === 0) {
+    grid.innerHTML = `<div class="loading">No games today.</div>`;
+    updateStatus('No active games');
+  } else {
+    todaysTeams.forEach(team => grid.appendChild(createTeamCard(team)));
+    updateStatus(`${todaysTeams.length} team${todaysTeams.length > 1 ? 's' : ''} playing today`);
+  }
 
-    card.addEventListener('click', () => toggleTeam(team));
-    grid.appendChild(card);
-  });
+  const allGrid = document.getElementById('allTeamsGrid');
+  allGrid.innerHTML = '';
+  otherTeams.forEach(team => allGrid.appendChild(createTeamCard(team)));
 
-  updateStatus(`${allTeams.length} teams in playoffs`);
   updateSelectedCount();
 }
 
-// Toggle a team on/off
+function createTeamCard(team) {
+  const isSelected = selectedTeams.has(team.espnId);
+  const card = document.createElement('div');
+  card.className = `team-card ${isSelected ? 'selected' : ''}`;
+  card.dataset.id = team.espnId;
+
+  card.innerHTML = `
+    <img class="team-logo" src="${team.logo}" alt="${team.abbreviation}">
+    <div class="team-abbr">${team.abbreviation}</div>
+  `;
+
+  card.addEventListener('click', () => toggleTeam(team));
+  return card;
+}
+
 function toggleTeam(team) {
   if (selectedTeams.has(team.espnId)) {
     selectedTeams.delete(team.espnId);
@@ -69,14 +83,14 @@ function toggleTeam(team) {
     selectedTeams.add(team.espnId);
   }
 
-  const card = document.querySelector(`[data-id="${team.espnId}"]`);
-  if (card) card.classList.toggle('selected', selectedTeams.has(team.espnId));
+  document.querySelectorAll(`[data-id="${team.espnId}"]`).forEach(card => {
+    card.classList.toggle('selected', selectedTeams.has(team.espnId));
+  });
 
   saveAndSync();
   updateSelectedCount();
 }
 
-// Save selected teams and tell content script to rescan
 function saveAndSync() {
   chrome.storage.local.set({ selectedTeams: [...selectedTeams] }, () => {
     chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
@@ -87,9 +101,16 @@ function saveAndSync() {
   });
 }
 
-// UI helpers
-function showLoading(message) {
-  document.getElementById('teamGrid').innerHTML = `
+document.getElementById('moreTeamsBtn').addEventListener('click', () => {
+  const btn = document.getElementById('moreTeamsBtn');
+  const section = document.getElementById('allTeamsSection');
+  allTeamsExpanded = !allTeamsExpanded;
+  btn.classList.toggle('open', allTeamsExpanded);
+  section.classList.toggle('visible', allTeamsExpanded);
+});
+
+function showLoading(gridId, message) {
+  document.getElementById(gridId).innerHTML = `
     <div class="loading">
       <div class="loading-spinner"></div>
       ${message}
@@ -97,8 +118,16 @@ function showLoading(message) {
   `;
 }
 
+function showError(message) {
+  const status = document.getElementById('status');
+  status.textContent = `⚠️ ${message}`;
+  status.style.color = '#f97316';
+}
+
 function updateStatus(text) {
-  document.getElementById('status').textContent = text;
+  const status = document.getElementById('status');
+  status.textContent = text;
+  status.style.color = '';
 }
 
 function updateLastUpdated() {
@@ -113,12 +142,10 @@ function updateSelectedCount() {
   el.textContent = count > 0 ? `${count} team${count > 1 ? 's' : ''} blocked` : '';
 }
 
-// Storage helper
 function getStorage(key) {
   return new Promise(resolve => chrome.storage.local.get(key, resolve));
 }
 
-// Refresh button
 document.getElementById('refreshBtn').addEventListener('click', () => {
   const btn = document.getElementById('refreshBtn');
   btn.classList.add('spinning');
@@ -126,9 +153,13 @@ document.getElementById('refreshBtn').addEventListener('click', () => {
 
   chrome.runtime.sendMessage({ type: 'FORCE_SYNC' }, () => {
     btn.classList.remove('spinning');
-    chrome.storage.local.get('playoffData', data => {
-      if (data.playoffData) {
-        allTeams = data.playoffData.teams;
+    chrome.storage.local.get(['spoilerData', 'syncError'], data => {
+      if (data.syncError) {
+        showError(data.syncError);
+      }
+      if (data.spoilerData) {
+        allTeams = data.spoilerData.teams;
+        todayIds = new Set(data.spoilerData.todayIds || []);
         renderTeams();
         updateLastUpdated();
       }
@@ -136,18 +167,22 @@ document.getElementById('refreshBtn').addEventListener('click', () => {
   });
 });
 
-// Listen for background data updates
 chrome.runtime.onMessage.addListener(msg => {
   if (msg.type === 'DATA_UPDATED') {
-    chrome.storage.local.get('playoffData', data => {
-      if (data.playoffData) {
-        allTeams = data.playoffData.teams;
+    chrome.storage.local.get('spoilerData', data => {
+      if (data.spoilerData) {
+        allTeams = data.spoilerData.teams;
+        todayIds = new Set(data.spoilerData.todayIds || []);
         renderTeams();
         updateLastUpdated();
       }
     });
   }
+  if (msg.type === 'SYNC_ERROR') {
+    chrome.storage.local.get('syncError', data => {
+      if (data.syncError) showError(data.syncError);
+    });
+  }
 });
 
-// Start
 init();

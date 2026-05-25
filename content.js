@@ -1,33 +1,106 @@
 // Spoiler Shield v3 - Content Script
 
+function createShieldHTML() {
+  return `
+    <div class="ss-shield-inner">
+      <div class="ss-shield-logo">🛡️</div>
+      <div class="ss-shield-title">SpoilerShield</div>
+      <div class="ss-shield-subtitle">Filtering spoilers...</div>
+      <div class="ss-shield-spinner"></div>
+    </div>
+  `;
+}
+
+let shieldShownAt = Date.now();
+let shieldRemoved = false;
+let scanComplete = false;
+
+function injectShield() {
+  const existing = document.getElementById('ss-page-shield');
+  if (existing) existing.remove();
+  const s = document.createElement('div');
+  s.id = 'ss-page-shield';
+  s.innerHTML = createShieldHTML();
+  document.documentElement.appendChild(s);
+  shieldShownAt = Date.now();
+  shieldRemoved = false;
+  scanComplete = false;
+
+  setTimeout(() => {
+    scanComplete = true;
+    removeShield();
+  }, 6000);
+}
+
+function removeShield() {
+  if (shieldRemoved) return;
+  const elapsed = Date.now() - shieldShownAt;
+  const remaining = Math.max(0, 2000 - elapsed);
+
+  setTimeout(() => {
+    if (shieldRemoved) return;
+    if (!scanComplete) {
+      setTimeout(() => removeShield(), 100);
+      return;
+    }
+    shieldRemoved = true;
+    const s = document.getElementById('ss-page-shield');
+    if (s) {
+      s.classList.add('fade-out');
+      setTimeout(() => s.remove(), 200);
+    }
+  }, remaining);
+}
+
+// Re-show shield on YouTube navigation (SPA page changes)
+let lastUrl = location.href;
+new MutationObserver(() => {
+  if (location.href !== lastUrl) {
+    lastUrl = location.href;
+    // Only re-inject if teams are selected
+    chrome.storage.local.get(['selectedTeams', 'enabled'], data => {
+      const selectedTeams = data.selectedTeams || [];
+      const enabled = data.enabled !== false;
+      if (selectedTeams.length > 0 && enabled) {
+        injectShield();
+      }
+    });
+  }
+}).observe(document.body, { childList: true, subtree: true });
+
 let blockedTeams = [];
 let isEnabled = true;
 
 // Load settings from storage
 function loadSettings(callback) {
-  chrome.storage.local.get(['playoffData', 'selectedTeams', 'enabled'], data => {
-    const playoffData = data.playoffData;
+  chrome.storage.local.get(['spoilerData', 'selectedTeams', 'enabled'], data => {
+    const spoilerData = data.spoilerData;
     const selectedIds = new Set(data.selectedTeams || []);
     isEnabled = data.enabled !== false;
 
-    if (playoffData && playoffData.teams) {
-      blockedTeams = playoffData.teams.filter(t => selectedIds.has(t.espnId));
+    if (spoilerData && spoilerData.teams) {
+      blockedTeams = spoilerData.teams.filter(t => selectedIds.has(t.espnId));
     }
 
     if (callback) callback();
   });
 }
 
-// Check if a text string matches any blocked team
+// Check if text matches any blocked team
 function matchesBlockedTeam(text) {
   if (!text) return null;
   const lower = text.toLowerCase();
 
   for (const team of blockedTeams) {
-    for (const keyword of team.keywords) {
-      if (lower.includes(keyword)) {
-        return team;
-      }
+    if (team.keywords.strong.some(k => lower.includes(k))) return team;
+
+    if (team.keywords.weak.some(k => lower.includes(k))) {
+      const teamWords = [
+        team.displayName.toLowerCase(),
+        team.name.toLowerCase(),
+        team.abbreviation.toLowerCase()
+      ];
+      if (teamWords.some(w => lower.includes(w))) return team;
     }
   }
   return null;
@@ -94,18 +167,13 @@ function getCardText(el) {
   ].join(' ').trim();
 }
 
-// Apply blur overlay to a video card
 function applyBlur(el, team) {
   if (el.dataset.ssBlurred === 'true') return;
   el.dataset.ssBlurred = 'true';
   el.dataset.ssTeam = team.espnId;
   el.style.position = 'relative';
   el.style.overflow = 'hidden';
-  el.style.filter = 'blur(6px)';
-  el.style.isolation = 'isolate';  // add this
-  el.style.transform = 'translateZ(0)'; // forces GPU layer isolation
-
-
+  el.style.filter = 'blur(10px)';
 
   const overlay = document.createElement('div');
   overlay.className = 'ss-overlay';
@@ -132,7 +200,6 @@ function applyBlur(el, team) {
   el.appendChild(overlay);
 }
 
-// Show confirmation dialog
 function showConfirmation(el, overlay, team) {
   document.querySelector('.ss-dialog')?.remove();
 
@@ -169,80 +236,79 @@ function showConfirmation(el, overlay, team) {
   });
 }
 
-// Scan all video cards on the page
 function scanPage() {
-  if (!isEnabled || blockedTeams.length === 0) return;
-
   const selectors = [
-    // Standard video cards
     'ytd-rich-item-renderer',
     'ytd-video-renderer',
     'ytd-compact-video-renderer',
     'ytd-grid-video-renderer',
     'ytd-video-with-context-renderer',
-    'ytd-watch-card-hero-video-renderer',
-
-    // Shorts
     'ytd-reel-item-renderer',
     'ytd-shorts',
     'ytd-reel-shelf-renderer',
     'ytm-shorts-lockup-view-model',
     'ytm-shorts-lockup-view-model-v2',
-    // Playlists
     'ytd-playlist-renderer',
     'ytd-compact-playlist-renderer',
     'ytd-grid-playlist-renderer',
     'ytd-radio-renderer',
     'ytd-compact-radio-renderer',
-    // Sidebar / watch page
     'ytd-watch-card-compact-video-renderer',
     'ytd-watch-card-rich-header-renderer',
-    // Movies / clips
     'ytd-movie-renderer',
     'ytd-clip-creation-renderer',
-    // Notifications / search
     'ytd-search-pyv-renderer',
     'ytd-notification-renderer',
-    // Live / upcoming
     'ytd-compact-live-meta-renderer',
-    // Channel page
     'ytd-channel-video-player-renderer',
     'ytd-featured-channel-renderer'
   ].join(', ');
 
-  document.querySelectorAll(selectors).forEach(el => {
-  if (el.dataset.ssBlurred === 'true') return;
-  if (el.dataset.ssBlurred === 'removed') return;
+  const cards = document.querySelectorAll(selectors);
 
-  const text = getCardText(el);
+  if (cards.length === 0) return;
 
-  if (!text) {
-    el.classList.add('ss-scanned');
+  if (!isEnabled || blockedTeams.length === 0) {
+    scanComplete = true;
+    removeShield();
     return;
   }
 
-  const team = matchesBlockedTeam(text);
-  if (team) {
-    applyBlur(el, team);
-  } else {
-    el.classList.add('ss-scanned');
-  }
-});
+  cards.forEach(el => {
+    if (el.dataset.ssBlurred === 'true') return;
+    if (el.dataset.ssBlurred === 'removed') return;
+
+    const text = getCardText(el);
+
+    if (!text) {
+      el.classList.add('ss-scanned');
+      return;
+    }
+
+    const team = matchesBlockedTeam(text);
+    if (team) {
+      applyBlur(el, team);
+    } else {
+      el.classList.add('ss-scanned');
+    }
+  });
+
+  scanComplete = true;
+  removeShield();
 }
 
-// Full reset - removes all blurs and rescans
 function fullReset() {
+  scanComplete = false;
   document.querySelectorAll('[data-ss-blurred="true"], .ss-scanned').forEach(el => {
     el.querySelector('.ss-overlay')?.remove();
     el.style.filter = 'none';
     el.dataset.ssBlurred = '';
-    el.classList.remove('ss-scanned'); // add this
+    el.classList.remove('ss-scanned');
   });
 
   loadSettings(() => scanPage());
 }
 
-// Watch for new videos loading (YouTube loads content dynamically)
 const observer = new MutationObserver(() => {
   clearTimeout(window._ssScanTimer);
   window._ssScanTimer = setTimeout(scanPage, 200);
@@ -253,10 +319,21 @@ observer.observe(document.body, {
   subtree: true
 });
 
-// Listen for messages from popup
 chrome.runtime.onMessage.addListener(msg => {
   if (msg.type === 'RESCAN') fullReset();
 });
 
-// Init
-loadSettings(() => scanPage());
+// Init — only inject shield if teams are selected
+chrome.storage.local.get(['selectedTeams', 'enabled'], data => {
+  const selectedTeams = data.selectedTeams || [];
+  const enabled = data.enabled !== false;
+
+  if (selectedTeams.length > 0 && enabled) {
+    injectShield();
+  } else {
+    scanComplete = true;
+    shieldRemoved = true;
+  }
+
+  loadSettings(() => scanPage());
+});

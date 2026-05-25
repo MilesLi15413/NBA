@@ -189,3 +189,64 @@ ytd-movie-renderer.ss-scanned {
   opacity: 1;
   animation: none;
 }
+
+#ss-page-shield {
+  position: fixed;
+  inset: 0;
+  z-index: 9999999;
+  background: rgba(13, 13, 26, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease;
+}
+
+#ss-page-shield.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.ss-shield-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.ss-shield-logo {
+  font-size: 48px;
+}
+
+.ss-shield-title {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.02em;
+}
+
+.ss-shield-title span {
+  color: #f97316;
+}
+
+.ss-shield-subtitle {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.ss-shield-spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-top-color: #f97316;
+  border-radius: 50%;
+  animation: ssShieldSpin 0.8s linear infinite;
+  margin-top: 6px;
+}
+
+@keyframes ssShieldSpin {
+  to { transform: rotate(360deg); }
+}
